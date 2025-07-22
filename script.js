@@ -20,7 +20,68 @@ const keyMap = {
     'KeyZ': 'z', 'KeyX': 'x', 'KeyC': 'c'
 };
 
-// Função principal para tocar som
+// 🔓 CORREÇÃO COMPLETA PARA ÁUDIO EM DISPOSITIVOS MÓVEIS
+let audioContextUnlocked = false;
+
+// Função para desbloquear o contexto de áudio
+function unlockAudioContext() {
+    if (audioContextUnlocked) return;
+    
+    console.log('🔓 Desbloqueando contexto de áudio para dispositivos móveis...');
+    
+    // Criar um contexto de áudio temporário
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+        const audioContext = new AudioContext();
+        
+        // Criar um buffer vazio e reproduzir
+        const buffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        
+        audioContext.close();
+    }
+    
+    // Reproduzir um áudio silencioso em todos os elementos de áudio
+    drumPads.forEach(pad => {
+        const audio = pad.querySelector('audio');
+        if (audio) {
+            // Criar uma cópia do áudio com volume zero para "despertar" o sistema
+            audio.volume = 0;
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.volume = currentVolume;
+                        console.log(`✅ Áudio ${pad.dataset.key} desbloqueado`);
+                    })
+                    .catch(error => {
+                        console.log(`❌ Erro ao desbloquear ${pad.dataset.key}:`, error);
+                    });
+            }
+        }
+    });
+    
+    audioContextUnlocked = true;
+    console.log('✅ Contexto de áudio desbloqueado com sucesso!');
+}
+
+// Event listeners para desbloquear áudio - múltiplos eventos para garantir compatibilidade
+const unlockEvents = ['touchstart', 'touchend', 'click', 'keydown'];
+
+unlockEvents.forEach(eventType => {
+    document.addEventListener(eventType, unlockAudioContext, { 
+        once: true, 
+        passive: true 
+    });
+});
+
+// Função principal para tocar som - CORRIGIDA PARA MOBILE
 function playSound(key) {
     const pad = document.querySelector(`.drum-pad[data-key="${key}"]`);
     if (!pad) {
@@ -42,17 +103,40 @@ function playSound(key) {
 
     console.log(`Tocando som: ${key} - ${audio.src}`);
 
+    // CORREÇÃO ESPECÍFICA PARA MOBILE
     audio.currentTime = 0;
     audio.volume = currentVolume;
     
-    audio.play()
-        .then(() => {
-            console.log(`✅ Som tocado com sucesso: ${key}`);
-        })
-        .catch(error => {
-            console.error(`❌ Erro ao reproduzir áudio ${key}:`, error);
-            audio.load();
-        });
+    // Força o carregamento do áudio antes de tocar (importante no mobile)
+    if (audio.readyState < 2) {
+        audio.load();
+    }
+    
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+        playPromise
+            .then(() => {
+                console.log(`✅ Som tocado com sucesso: ${key}`);
+            })
+            .catch(error => {
+                console.error(`❌ Erro ao reproduzir áudio ${key}:`, error);
+                
+                // Tentativa de recuperação para dispositivos móveis
+                if (!audioContextUnlocked) {
+                    console.log('🔄 Tentando desbloquear contexto de áudio...');
+                    unlockAudioContext();
+                }
+                
+                // Segunda tentativa
+                setTimeout(() => {
+                    audio.load();
+                    audio.play().catch(e => {
+                        console.error(`❌ Segunda tentativa falhou para ${key}:`, e);
+                    });
+                }, 100);
+            });
+    }
 
     pad.classList.add('active');
     setTimeout(() => {
@@ -205,13 +289,6 @@ function checkAudioFiles() {
         }
     });
 }
-
-// 🔓 Liberação de áudio em dispositivos móveis
-// Essa função é executada no primeiro toque na tela para liberar o uso de áudio
-document.addEventListener('touchstart', () => {
-    const audio = new Audio();
-    audio.play().catch(() => {});
-}, { once: true });
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
