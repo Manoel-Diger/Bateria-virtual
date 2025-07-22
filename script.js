@@ -206,6 +206,13 @@ function checkAudioFiles() {
     });
 }
 
+// 🔓 Liberação de áudio em dispositivos móveis
+// Essa função é executada no primeiro toque na tela para liberar o uso de áudio
+document.addEventListener('touchstart', () => {
+    const audio = new Audio();
+    audio.play().catch(() => {});
+}, { once: true });
+
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🥁 Bateria Virtual Pro carregada!');

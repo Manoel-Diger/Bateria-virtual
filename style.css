@@ -215,3 +215,42 @@ button:active {
         transform: translate(-50%, -50%) scale(1);
     }
 }
+
+@media (max-width: 600px) {
+    .drum-kit {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    .drum-pad {
+        width: 90px;
+        height: 90px;
+        border-radius: 15px;
+    }
+
+    .drum-pad .key {
+        font-size: 1rem;
+        width: 30px;
+        height: 30px;
+    }
+
+    .drum-pad .name {
+        font-size: 0.7rem;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .recording-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
