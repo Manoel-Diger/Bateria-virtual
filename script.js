@@ -4,7 +4,18 @@ let recordedBeats = [];
 let startTime = 0;
 let currentVolume = 0.7;
 
-// Elementos do DOM
+const volumeGain = {
+    'q': 3.5,  
+    'w': 1.0,  
+    'e': 1.0,  
+    'a': 1.0,  
+    's': 1.0,  
+    'd': 1.0,  
+    'z': 1.0,  
+    'x': 1.0,  
+    'c': 1.0   
+};
+
 const drumPads = document.querySelectorAll('.drum-pad');
 const recordBtn = document.getElementById('recordBtn');
 const playBtn = document.getElementById('playBtn');
@@ -12,50 +23,125 @@ const clearBtn = document.getElementById('clearBtn');
 const volumeControl = document.getElementById('volumeControl');
 const keyDisplay = document.getElementById('keyDisplay');
 const kitSelect = document.getElementById('kitSelect');
+const demoBtn = document.getElementById('demoBtn');
 
-// Mapeamento de teclas
+const drumSoloDemo = [
+    
+    { key: 'q', timestamp: 0 },     
+    { key: 's', timestamp: 250 },   
+    { key: 'q', timestamp: 500 },   
+    { key: 's', timestamp: 750 },   
+    
+    { key: 'w', timestamp: 1000 },  
+    { key: 'q', timestamp: 1000 },  
+    { key: 'w', timestamp: 1125 },  
+    { key: 's', timestamp: 1250 },  
+    { key: 'w', timestamp: 1375 },  
+    
+    { key: 'q', timestamp: 1500 },  
+    { key: 'w', timestamp: 1500 },  
+    { key: 'a', timestamp: 1625 },  
+    { key: 'w', timestamp: 1750 },  
+    { key: 's', timestamp: 1750 },  
+    { key: 'd', timestamp: 1875 },  
+    
+    { key: 'a', timestamp: 2000 },  
+    { key: 'a', timestamp: 2125 },  
+    { key: 'd', timestamp: 2250 },  
+    { key: 'z', timestamp: 2375 },  
+    { key: 'z', timestamp: 2500 },  
+    
+    { key: 'e', timestamp: 2750 },  
+    { key: 'q', timestamp: 2750 },  
+    { key: 's', timestamp: 3000 },  
+    { key: 'q', timestamp: 3125 },  
+    { key: 'q', timestamp: 3250 },  
+    
+    { key: 'w', timestamp: 3375 },  
+    { key: 'w', timestamp: 3438 },  
+    { key: 'w', timestamp: 3500 },  
+    { key: 'w', timestamp: 3563 },  
+    { key: 's', timestamp: 3625 },  
+    
+    { key: 'a', timestamp: 3750 },  
+    { key: 'd', timestamp: 3813 },  
+    { key: 'z', timestamp: 3875 },  
+    { key: 'a', timestamp: 3938 },  
+    { key: 'd', timestamp: 4000 },  
+    
+    { key: 'q', timestamp: 4250 },  
+    { key: 'e', timestamp: 4250 },  
+    { key: 's', timestamp: 4500 },  
+    { key: 'c', timestamp: 4500 },  
+    { key: 'q', timestamp: 4750 },  
+    { key: 'e', timestamp: 4750 },  
+];
+
+function playDrumSolo() {
+    console.log('🎵 Iniciando solo de bateria demonstrativo...');
+    
+    if (demoBtn) demoBtn.disabled = true;
+    if (playBtn) playBtn.disabled = true;
+    if (recordBtn) recordBtn.disabled = true;
+    
+    if (demoBtn) demoBtn.textContent = '🎵 Tocando Solo...';
+    
+    drumSoloDemo.forEach(beat => {
+        setTimeout(() => {
+            playSound(beat.key);
+        }, beat.timestamp);
+    });
+    
+    const soloDuration = drumSoloDemo[drumSoloDemo.length - 1].timestamp;
+    
+    setTimeout(() => {
+        if (demoBtn) {
+            demoBtn.disabled = false;
+            demoBtn.textContent = '🎵 Solo Demo';
+        }
+        if (playBtn) playBtn.disabled = recordedBeats.length === 0;
+        if (recordBtn) recordBtn.disabled = false;
+        
+        console.log('🎉 Solo de bateria finalizado!');
+    }, soloDuration + 1000);
+}
+
 const keyMap = {
     'KeyQ': 'q', 'KeyW': 'w', 'KeyE': 'e',
     'KeyA': 'a', 'KeyS': 's', 'KeyD': 'd',
     'KeyZ': 'z', 'KeyX': 'x', 'KeyC': 'c'
 };
 
-// 🔓 SOLUÇÃO DEFINITIVA PARA ÁUDIO EM DISPOSITIVOS MÓVEIS
 let mobileAudioEnabled = false;
 let audioPool = {};
 
-// Função para detectar dispositivo móvel
 function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
            ('ontouchstart' in window) || 
            (navigator.maxTouchPoints > 0);
 }
 
-// Criar pool de áudios para mobile
 function createAudioPool() {
     const keys = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'];
     
     keys.forEach(key => {
         audioPool[key] = new Audio(`sounds/key${key}.wav`);
         audioPool[key].preload = 'auto';
-        audioPool[key].volume = currentVolume;
+        audioPool[key].volume = Math.min(1.0, currentVolume * volumeGain[key]);
         audioPool[key].load();
     });
     
     console.log('🎵 Pool de áudios criado para dispositivos móveis');
 }
 
-// Função para habilitar áudio em dispositivos móveis
 function enableMobileAudio() {
     if (mobileAudioEnabled) return;
     
     console.log('🔓 Habilitando áudio para dispositivos móveis...');
     
-    // Criar pool de áudios se for mobile
     if (isMobileDevice()) {
         createAudioPool();
         
-        // Tocar todos os áudios silenciosamente para "acordar" o sistema
         Object.keys(audioPool).forEach(key => {
             const audio = audioPool[key];
             audio.volume = 0;
@@ -66,7 +152,7 @@ function enableMobileAudio() {
                     .then(() => {
                         audio.pause();
                         audio.currentTime = 0;
-                        audio.volume = currentVolume;
+                        audio.volume = Math.min(1.0, currentVolume * volumeGain[key]);
                         console.log(`✅ Áudio ${key} habilitado para mobile`);
                     })
                     .catch(error => {
@@ -75,7 +161,6 @@ function enableMobileAudio() {
             }
         });
     } else {
-        // Desktop - usar método original
         drumPads.forEach(pad => {
             const audio = pad.querySelector('audio');
             if (audio) {
@@ -87,7 +172,8 @@ function enableMobileAudio() {
                         .then(() => {
                             audio.pause();
                             audio.currentTime = 0;
-                            audio.volume = currentVolume;
+                            const key = pad.getAttribute('data-key');
+                            audio.volume = Math.min(1.0, currentVolume * volumeGain[key]);
                         })
                         .catch(() => {});
                 }
@@ -99,12 +185,10 @@ function enableMobileAudio() {
     console.log('✅ Áudio habilitado com sucesso!');
 }
 
-// Event listener específico para mobile - usando 'click' em vez de 'touchstart'
 document.addEventListener('click', enableMobileAudio, { once: true });
 document.addEventListener('touchend', enableMobileAudio, { once: true });
 document.addEventListener('keydown', enableMobileAudio, { once: true });
 
-// Função principal para tocar som - OTIMIZADA PARA MOBILE
 function playSound(key) {
     const pad = document.querySelector(`.drum-pad[data-key="${key}"]`);
     if (!pad) {
@@ -114,14 +198,11 @@ function playSound(key) {
 
     let audio;
 
-    // Usar pool de áudios se for dispositivo móvel
     if (isMobileDevice() && audioPool[key]) {
         audio = audioPool[key];
     } else {
-        // Desktop - usar método original
         audio = pad.querySelector('audio');
         
-        // Correção específica para a tecla "s"
         if (key === 's') {
             audio = new Audio('sounds/keys.wav');
         }
@@ -134,11 +215,9 @@ function playSound(key) {
 
     console.log(`Tocando som: ${key} - ${audio.src || 'pool audio'}`);
 
-    // Resetar áudio
     audio.currentTime = 0;
-    audio.volume = currentVolume;
+    audio.volume = Math.min(1.0, currentVolume * volumeGain[key]);
     
-    // Reproduzir áudio
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
@@ -149,7 +228,6 @@ function playSound(key) {
             .catch(error => {
                 console.error(`❌ Erro ao reproduzir áudio ${key}:`, error);
                 
-                // Tentar novamente se não foi habilitado ainda
                 if (!mobileAudioEnabled) {
                     enableMobileAudio();
                     setTimeout(() => playSound(key), 200);
@@ -170,7 +248,6 @@ function playSound(key) {
     }
 }
 
-// Função para mostrar a tecla pressionada na tela
 function showKeyDisplay(key) {
     keyDisplay.textContent = key;
     keyDisplay.classList.add('show');
@@ -180,7 +257,6 @@ function showKeyDisplay(key) {
     }, 800);
 }
 
-// Event listeners para teclas do teclado
 document.addEventListener('keydown', (e) => {
     const key = keyMap[e.code];
     if (key) {
@@ -189,7 +265,6 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Event listeners para cliques nos pads
 drumPads.forEach(pad => {
     pad.addEventListener('click', () => {
         const key = pad.getAttribute('data-key');
@@ -197,27 +272,25 @@ drumPads.forEach(pad => {
     });
 });
 
-// Controle de volume
 volumeControl.addEventListener('input', (e) => {
     currentVolume = e.target.value / 100;
     console.log(`Volume alterado para: ${Math.round(currentVolume * 100)}%`);
     
-    // Atualizar volume nos áudios
     if (isMobileDevice() && audioPool) {
         Object.keys(audioPool).forEach(key => {
-            audioPool[key].volume = currentVolume;
+            audioPool[key].volume = Math.min(1.0, currentVolume * volumeGain[key]);
         });
     } else {
         drumPads.forEach(pad => {
             const audio = pad.querySelector('audio');
             if (audio) {
-                audio.volume = currentVolume;
+                const key = pad.getAttribute('data-key');
+                audio.volume = Math.min(1.0, currentVolume * volumeGain[key]);
             }
         });
     }
 });
 
-// Gravação
 recordBtn.addEventListener('click', () => {
     if (!isRecording) {
         isRecording = true;
@@ -236,7 +309,6 @@ recordBtn.addEventListener('click', () => {
     }
 });
 
-// Reprodução
 playBtn.addEventListener('click', () => {
     if (recordedBeats.length === 0) return;
 
@@ -260,7 +332,6 @@ playBtn.addEventListener('click', () => {
     }, lastBeatTime + 1000);
 });
 
-// Limpar gravação
 clearBtn.addEventListener('click', () => {
     recordedBeats = [];
     playBtn.disabled = true;
@@ -271,12 +342,15 @@ clearBtn.addEventListener('click', () => {
     console.log('🗑️ Gravação limpa');
 });
 
-// Kit de bateria (futuro)
 kitSelect.addEventListener('change', (e) => {
     console.log('Kit selecionado:', e.target.value);
 });
 
-// Teste de todos os sons
+if (demoBtn) {
+    demoBtn.addEventListener('click', playDrumSolo);
+}
+
+
 function testAllSounds() {
     const keys = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'];
     let index = 0;
@@ -297,7 +371,6 @@ function testAllSounds() {
     playNext();
 }
 
-// Verificação de arquivos de áudio
 function checkAudioFiles() {
     console.log('📁 Verificando arquivos de áudio...');
     
@@ -328,7 +401,6 @@ function checkAudioFiles() {
     }
 }
 
-// Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🥁 Bateria Virtual Pro carregada!');
     console.log(`📱 Dispositivo móvel detectado: ${isMobileDevice()}`);
@@ -337,14 +409,14 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`Volume inicial: ${Math.round(currentVolume * 100)}%`);
     
     if (!isMobileDevice()) {
-        // Desktop - carregar áudios normalmente
         let loadedCount = 0;
         const totalAudios = drumPads.length;
         
         drumPads.forEach(pad => {
             const audio = pad.querySelector('audio');
             if (audio) {
-                audio.volume = currentVolume;
+                const key = pad.getAttribute('data-key');
+                audio.volume = Math.min(1.0, currentVolume * volumeGain[key]);
 
                 audio.addEventListener('canplaythrough', () => {
                     loadedCount++;
@@ -365,26 +437,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.testAllSounds = testAllSounds;
     window.checkAudioFiles = checkAudioFiles;
+    window.playDrumSolo = playDrumSolo; 
 
     console.log('💡 Dicas:');
     console.log('- Digite "testAllSounds()" no console para testar todos os sons');
     console.log('- Digite "checkAudioFiles()" no console para verificar os arquivos');
+    console.log('- Digite "playDrumSolo()" no console para tocar o solo demonstrativo'); // ✨ NOVO
     
     if (isMobileDevice()) {
         console.log('📱 IMPORTANTE: Toque na tela primeiro para habilitar o áudio!');
     }
 });
 
-// Previne comportamento padrão
 document.addEventListener('keydown', (e) => {
     if (keyMap[e.code]) {
         e.preventDefault();
     }
 });
 
-// Efeito visual para mobile - MELHORADO
+
 drumPads.forEach(pad => {
-    // Para dispositivos móveis - usar touchstart para feedback visual, mas click para áudio
     pad.addEventListener('touchstart', (e) => {
         e.preventDefault();
         pad.classList.add('active');
@@ -396,7 +468,6 @@ drumPads.forEach(pad => {
             pad.classList.remove('active');
         }, 150);
         
-        // Garantir que o som toque no touchend também
         const key = pad.getAttribute('data-key');
         if (key && mobileAudioEnabled) {
             playSound(key);
