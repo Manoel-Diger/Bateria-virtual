@@ -215,29 +215,3 @@ button:active {
         transform: translate(-50%, -50%) scale(1);
     }
 }
-
-@media (max-width: 768px) {
-    .drum-kit {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-    }
-    
-    .drum-pad {
-        width: 120px;
-        height: 120px;
-    }
-    
-    .header h1 {
-        font-size: 2rem;
-    }
-    
-    .controls {
-        flex-direction: column;
-        gap: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .drum-kit {
-        grid-template-columns: 1fr;
-    }
