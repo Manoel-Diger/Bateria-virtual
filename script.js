@@ -20,68 +20,91 @@ const keyMap = {
     'KeyZ': 'z', 'KeyX': 'x', 'KeyC': 'c'
 };
 
-// 🔓 CORREÇÃO COMPLETA PARA ÁUDIO EM DISPOSITIVOS MÓVEIS
-let audioContextUnlocked = false;
+// 🔓 SOLUÇÃO DEFINITIVA PARA ÁUDIO EM DISPOSITIVOS MÓVEIS
+let mobileAudioEnabled = false;
+let audioPool = {};
 
-// Função para desbloquear o contexto de áudio
-function unlockAudioContext() {
-    if (audioContextUnlocked) return;
+// Função para detectar dispositivo móvel
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           ('ontouchstart' in window) || 
+           (navigator.maxTouchPoints > 0);
+}
+
+// Criar pool de áudios para mobile
+function createAudioPool() {
+    const keys = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'];
     
-    console.log('🔓 Desbloqueando contexto de áudio para dispositivos móveis...');
+    keys.forEach(key => {
+        audioPool[key] = new Audio(`sounds/key${key}.wav`);
+        audioPool[key].preload = 'auto';
+        audioPool[key].volume = currentVolume;
+        audioPool[key].load();
+    });
     
-    // Criar um contexto de áudio temporário
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) {
-        const audioContext = new AudioContext();
+    console.log('🎵 Pool de áudios criado para dispositivos móveis');
+}
+
+// Função para habilitar áudio em dispositivos móveis
+function enableMobileAudio() {
+    if (mobileAudioEnabled) return;
+    
+    console.log('🔓 Habilitando áudio para dispositivos móveis...');
+    
+    // Criar pool de áudios se for mobile
+    if (isMobileDevice()) {
+        createAudioPool();
         
-        // Criar um buffer vazio e reproduzir
-        const buffer = audioContext.createBuffer(1, 1, 22050);
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start(0);
-        
-        audioContext.close();
-    }
-    
-    // Reproduzir um áudio silencioso em todos os elementos de áudio
-    drumPads.forEach(pad => {
-        const audio = pad.querySelector('audio');
-        if (audio) {
-            // Criar uma cópia do áudio com volume zero para "despertar" o sistema
+        // Tocar todos os áudios silenciosamente para "acordar" o sistema
+        Object.keys(audioPool).forEach(key => {
+            const audio = audioPool[key];
             audio.volume = 0;
-            const playPromise = audio.play();
             
+            const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
                         audio.pause();
                         audio.currentTime = 0;
                         audio.volume = currentVolume;
-                        console.log(`✅ Áudio ${pad.dataset.key} desbloqueado`);
+                        console.log(`✅ Áudio ${key} habilitado para mobile`);
                     })
                     .catch(error => {
-                        console.log(`❌ Erro ao desbloquear ${pad.dataset.key}:`, error);
+                        console.log(`❌ Erro ao habilitar ${key} no mobile:`, error);
                     });
             }
-        }
-    });
+        });
+    } else {
+        // Desktop - usar método original
+        drumPads.forEach(pad => {
+            const audio = pad.querySelector('audio');
+            if (audio) {
+                audio.volume = 0;
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                            audio.volume = currentVolume;
+                        })
+                        .catch(() => {});
+                }
+            }
+        });
+    }
     
-    audioContextUnlocked = true;
-    console.log('✅ Contexto de áudio desbloqueado com sucesso!');
+    mobileAudioEnabled = true;
+    console.log('✅ Áudio habilitado com sucesso!');
 }
 
-// Event listeners para desbloquear áudio - múltiplos eventos para garantir compatibilidade
-const unlockEvents = ['touchstart', 'touchend', 'click', 'keydown'];
+// Event listener específico para mobile - usando 'click' em vez de 'touchstart'
+document.addEventListener('click', enableMobileAudio, { once: true });
+document.addEventListener('touchend', enableMobileAudio, { once: true });
+document.addEventListener('keydown', enableMobileAudio, { once: true });
 
-unlockEvents.forEach(eventType => {
-    document.addEventListener(eventType, unlockAudioContext, { 
-        once: true, 
-        passive: true 
-    });
-});
-
-// Função principal para tocar som - CORRIGIDA PARA MOBILE
+// Função principal para tocar som - OTIMIZADA PARA MOBILE
 function playSound(key) {
     const pad = document.querySelector(`.drum-pad[data-key="${key}"]`);
     if (!pad) {
@@ -89,11 +112,19 @@ function playSound(key) {
         return;
     }
 
-    let audio = pad.querySelector('audio');
+    let audio;
 
-    // Correção específica para a tecla "s"
-    if (key === 's') {
-        audio = new Audio('sounds/keys.wav');
+    // Usar pool de áudios se for dispositivo móvel
+    if (isMobileDevice() && audioPool[key]) {
+        audio = audioPool[key];
+    } else {
+        // Desktop - usar método original
+        audio = pad.querySelector('audio');
+        
+        // Correção específica para a tecla "s"
+        if (key === 's') {
+            audio = new Audio('sounds/keys.wav');
+        }
     }
 
     if (!audio) {
@@ -101,17 +132,13 @@ function playSound(key) {
         return;
     }
 
-    console.log(`Tocando som: ${key} - ${audio.src}`);
+    console.log(`Tocando som: ${key} - ${audio.src || 'pool audio'}`);
 
-    // CORREÇÃO ESPECÍFICA PARA MOBILE
+    // Resetar áudio
     audio.currentTime = 0;
     audio.volume = currentVolume;
     
-    // Força o carregamento do áudio antes de tocar (importante no mobile)
-    if (audio.readyState < 2) {
-        audio.load();
-    }
-    
+    // Reproduzir áudio
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
@@ -122,19 +149,11 @@ function playSound(key) {
             .catch(error => {
                 console.error(`❌ Erro ao reproduzir áudio ${key}:`, error);
                 
-                // Tentativa de recuperação para dispositivos móveis
-                if (!audioContextUnlocked) {
-                    console.log('🔄 Tentando desbloquear contexto de áudio...');
-                    unlockAudioContext();
+                // Tentar novamente se não foi habilitado ainda
+                if (!mobileAudioEnabled) {
+                    enableMobileAudio();
+                    setTimeout(() => playSound(key), 200);
                 }
-                
-                // Segunda tentativa
-                setTimeout(() => {
-                    audio.load();
-                    audio.play().catch(e => {
-                        console.error(`❌ Segunda tentativa falhou para ${key}:`, e);
-                    });
-                }, 100);
             });
     }
 
@@ -183,12 +202,19 @@ volumeControl.addEventListener('input', (e) => {
     currentVolume = e.target.value / 100;
     console.log(`Volume alterado para: ${Math.round(currentVolume * 100)}%`);
     
-    drumPads.forEach(pad => {
-        const audio = pad.querySelector('audio');
-        if (audio) {
-            audio.volume = currentVolume;
-        }
-    });
+    // Atualizar volume nos áudios
+    if (isMobileDevice() && audioPool) {
+        Object.keys(audioPool).forEach(key => {
+            audioPool[key].volume = currentVolume;
+        });
+    } else {
+        drumPads.forEach(pad => {
+            const audio = pad.querySelector('audio');
+            if (audio) {
+                audio.volume = currentVolume;
+            }
+        });
+    }
 });
 
 // Gravação
@@ -275,51 +301,67 @@ function testAllSounds() {
 function checkAudioFiles() {
     console.log('📁 Verificando arquivos de áudio...');
     
-    drumPads.forEach(pad => {
-        const key = pad.getAttribute('data-key');
-        const audio = pad.querySelector('audio');
-        
-        if (audio) {
-            console.log(`Áudio ${key}:`, {
+    if (isMobileDevice() && audioPool) {
+        Object.keys(audioPool).forEach(key => {
+            const audio = audioPool[key];
+            console.log(`Áudio ${key} (pool):`, {
                 src: audio.src,
                 readyState: audio.readyState,
                 duration: audio.duration,
                 error: audio.error
             });
-        }
-    });
+        });
+    } else {
+        drumPads.forEach(pad => {
+            const key = pad.getAttribute('data-key');
+            const audio = pad.querySelector('audio');
+            
+            if (audio) {
+                console.log(`Áudio ${key}:`, {
+                    src: audio.src,
+                    readyState: audio.readyState,
+                    duration: audio.duration,
+                    error: audio.error
+                });
+            }
+        });
+    }
 }
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🥁 Bateria Virtual Pro carregada!');
+    console.log(`📱 Dispositivo móvel detectado: ${isMobileDevice()}`);
     
     currentVolume = volumeControl.value / 100;
     console.log(`Volume inicial: ${Math.round(currentVolume * 100)}%`);
     
-    let loadedCount = 0;
-    const totalAudios = drumPads.length;
-    
-    drumPads.forEach(pad => {
-        const audio = pad.querySelector('audio');
-        if (audio) {
-            audio.volume = currentVolume;
+    if (!isMobileDevice()) {
+        // Desktop - carregar áudios normalmente
+        let loadedCount = 0;
+        const totalAudios = drumPads.length;
+        
+        drumPads.forEach(pad => {
+            const audio = pad.querySelector('audio');
+            if (audio) {
+                audio.volume = currentVolume;
 
-            audio.addEventListener('canplaythrough', () => {
-                loadedCount++;
-                console.log(`✅ Áudio carregado (${loadedCount}/${totalAudios}): ${audio.src}`);
-                if (loadedCount === totalAudios) {
-                    console.log('🎉 Todos os áudios carregados com sucesso!');
-                }
-            });
+                audio.addEventListener('canplaythrough', () => {
+                    loadedCount++;
+                    console.log(`✅ Áudio carregado (${loadedCount}/${totalAudios}): ${audio.src}`);
+                    if (loadedCount === totalAudios) {
+                        console.log('🎉 Todos os áudios carregados com sucesso!');
+                    }
+                });
 
-            audio.addEventListener('error', (e) => {
-                console.error(`❌ Erro ao carregar áudio: ${audio.src}`, e);
-            });
+                audio.addEventListener('error', (e) => {
+                    console.error(`❌ Erro ao carregar áudio: ${audio.src}`, e);
+                });
 
-            audio.load();
-        }
-    });
+                audio.load();
+            }
+        });
+    }
 
     window.testAllSounds = testAllSounds;
     window.checkAudioFiles = checkAudioFiles;
@@ -327,6 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('💡 Dicas:');
     console.log('- Digite "testAllSounds()" no console para testar todos os sons');
     console.log('- Digite "checkAudioFiles()" no console para verificar os arquivos');
+    
+    if (isMobileDevice()) {
+        console.log('📱 IMPORTANTE: Toque na tela primeiro para habilitar o áudio!');
+    }
 });
 
 // Previne comportamento padrão
@@ -336,8 +382,9 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Efeito visual para mobile
+// Efeito visual para mobile - MELHORADO
 drumPads.forEach(pad => {
+    // Para dispositivos móveis - usar touchstart para feedback visual, mas click para áudio
     pad.addEventListener('touchstart', (e) => {
         e.preventDefault();
         pad.classList.add('active');
@@ -348,5 +395,11 @@ drumPads.forEach(pad => {
         setTimeout(() => {
             pad.classList.remove('active');
         }, 150);
+        
+        // Garantir que o som toque no touchend também
+        const key = pad.getAttribute('data-key');
+        if (key && mobileAudioEnabled) {
+            playSound(key);
+        }
     });
 });
